@@ -1,140 +1,226 @@
 // Create a new isolate limited to 128MB
 let ivm = require('isolated-vm');
 const WebSocket = require('ws');
-let isolate = new ivm.Isolate({ inspector: true });
+let isolate = new ivm.Isolate({inspector: true});
 
-let context = isolate.createContextSync({ inspector: true });
+let context = isolate.createContextSync({inspector: true});
 let jail = context.global;
 
+function deepReference(obj, ivm, depth = 0) {
+    let newObj = {};
+
+    if (!ivm) {
+        throw new Error('Missing argument ivm');
+    }
+
+    if (depth > 0) {
+        Object.keys(obj).forEach(key => {
+            // might not be good enough
+            if (typeof obj[key] === 'object' && !Buffer.isBuffer(key)) {
+                newObj[key] = deepReference(obj[key], ivm, depth - 1);
+            }
+        });
+    } else {
+        newObj = new ivm.Reference(obj);
+    }
+
+    return newObj;
+}
+
 jail.setSync('global', jail.derefInto());
-jail.setSync('_console', new ivm.Reference({x: 2, y: 3, m: new ivm.Reference(function() {return 'ana';})}));
 jail.setSync('_ivm', ivm);
-jail.setSync('_log', new ivm.Reference(function(...args) {
-    console.log(...args);
-}));
+jail.setSync('_console', deepReference(console, ivm));
+// jail.setSync('_setTimeout', new ivm.Reference(function(timeout) {
+//    return new Promise((resolve, reject) => {
+//        console.log('sunt afara si am pornit');
+//        setTimeout(() => {
+//            console.log('sunt afara si am mers');
+//            resolve();
+//        }, timeout)
+//    });
+// }));
 
-const utils = require('util');
 
-console.log('x', utils.inspect(ivm.lib.hrtime, {showHidden: true, depth: 10, colors: true, showProxy:true}));
 
-jail.setSync('stdout', new ivm.Reference(process.stdout));
-
-const code = 'new '+ function () {
+const code = 'new ' + function () {
     debugger;
     let ivm = _ivm;
     delete _ivm;
 
-    let log = _log;
+    function ReferenceAccess() {
+        const referenceAccessHandler = {
+            get: function (target, prop) {
+                let unwrappedValue;
 
-    // delete _log;
-    global.log = function(...args) {
-       const transform = (arg) => {
-           const type = typeof arg;
-           if(type === 'object') {
-               arg = arg.constructor.name + ' ' + JSON.stringify(arg);
-           }
+                if (objectIsReference(target)) {
+                    const rawProperty = target.getSync(prop);
 
-           return arg;
-       };
-        log.applyIgnored(undefined, args.map(arg => new ivm.ExternalCopy(transform(arg)).copyInto()));
-    };
-    // let console = new ivm.ExternalCopy(_console).copy();
-    let console = _console.copySync();
-    // let m = console.m.copyInto();
-    let mRef = console.m;
-    // global.log(new ivm.ExternalCopy(mRef).copyInto());
-    let m = function(...args) {
-        global.log(mRef.applySync(undefined));
+                    if (isFunction(rawProperty)) {
+                        unwrappedValue = toNativeFunction(rawProperty);
+                    } else if (isNativeValue(rawProperty)) {
+                        unwrappedValue = toNativeValue(rawProperty);
+                    } else {
+                        unwrappedValue = new Proxy(rawProperty, referenceAccessHandler);
+                    }
+
+                } else {
+                    unwrappedValue = target[prop];
+                }
+
+                return unwrappedValue;
+            },
+            set: function (target, prop, value) {
+                // needs more testing
+
+                if (objectIsReference(target)) {
+                    target.setSync(prop, value);
+                } else {
+                    target[prop] = value;
+                }
+
+                return true;
+            },
+            ownKeys: function (reference) {
+                // doesn't work yet, target should use 'deepReference' function (which might come with a performance penalty)
+                // to be able to copySync each level individually instead of trying to parse the entire object which
+                // causes and error to be thrown most of the time due to native code that can't be copied
+
+                try {
+                    const nativeObject = reference.copySync();
+
+                    return Reflect.ownKeys(nativeObject);
+                } catch (e) {
+                    return []
+                }
+            }
+        };
+
+        function getAccessProxy(obj) {
+            return new Proxy(obj, referenceAccessHandler);
+        }
+
+
+        function objectIsReference(obj) {
+            return !!(typeof obj === 'object' && obj.constructor.name === 'Reference' && obj.typeof && obj.getSync);
+        }
+
+        function isFunction(reference) {
+            return !!(reference.typeof === 'function' || typeof reference === 'function');
+        }
+
+        function toNativeFunction(reference) {
+            if (reference.typeof === 'function') {
+                return function (...args) {
+                    // this probably looses the reference to `this`
+
+                    return reference.applySync(undefined, args);
+                }
+            } else if (typeof reference === 'function') {
+                return reference;
+            }
+        }
+
+        function isNativeValue(reference) {
+            return reference.typeof !== 'object';
+        }
+
+        function toNativeValue(reference) {
+            return reference.copySync();
+        }
+
+        return {
+            getAccessProxy
+        };
     }
 
-    // global.log(new Proxy({}, {}))
-    // let out = stdout.getSync('write');
 
-    // let std = new ivm.ExternalCopy(stdout);
+    function wrapConsoleLogs(consoleSource) {
+        return {
+            log: wrapper(consoleSource.log),
+            warn: wrapper(consoleSource.warn),
+            error: wrapper(consoleSource.error),
+            info: wrapper(consoleSource.info)
+        };
 
-    global.log(stdout);
+        function wrapper(fn) {
+            return function (...args) {
+                try {
+                    fn.apply(undefined, args.map(arg => new ivm.ExternalCopy(transform(arg)).copyInto()));
+                } catch (e) {
+                    consoleSource.error('>>> [error] could not display non-transferable value');
+                }
+            }
+        }
 
-    // for (let entry in std) {
-    //     global.log(entry)
+        function transform(arg) {
+            const type = typeof arg;
+            if (type === 'object') {
+                arg = arg.constructor.name + ' ' + JSON.stringify(arg);
+            }
+
+            return arg;
+        }
+    }
+
+    let _rawConsole = _console;
+    delete _console;
+
+    const consoleProxy = ReferenceAccess().getAccessProxy(_rawConsole);
+    const consoleWrapper = wrapConsoleLogs(consoleProxy);
+
+    console = new Proxy(consoleProxy, {
+        get: function (target, prop) {
+            if (Object.keys(consoleWrapper).includes(prop)) {
+                return consoleWrapper[prop];
+            }
+
+            return target[prop];
+        }
+    });
+
+    // setTimeout = function(timeout) {
+    //     console.log('hai timeout', _setTimeout.typeof);
+    //     _setTimeout.apply(undefined, [timeout])
+    //         .then(() => {
+    //             console.log('A MERS TIMEOUT MAAAI');
+    //         })
+    //         .catch(console.error)
     // }
+    //
+    // setTimeout(100);
 
-    // let megaConsole = {
-    //     log: function(...args) {console.getSync('log').applyIgnored(undefined, args) },
-    //     error: console.getSync('error')
-    // };
-    // // let loggy = console.getSync('log');
-    // megaConsole.log('da');
-    // global.log(console);
+
 };
 
 
-// This will bootstrap the context. Prependeng 'new ' to a function is just a convenient way to
-// convert that function into a self-executing closure that is still syntax highlighted by
-// editors. It drives strict mode and linters crazy though.
-// let bootstrap = isolate.compileScriptSync('new '+ function() {
-//     for(;;)debugger;
-//     let ivm = _ivm;
-//     delete _ivm;
-//
-//     let log = _log;
-//
-//     // delete _log;
-//     global.log = function(...args) {
-//         // We use `copyInto()` here so that on the other side we don't have to call `copy()`. It
-//         // doesn't make a difference who requests the copy, the result is the same.
-//         // `applyIgnored` calls `log` asynchronously but doesn't return a promise-- it ignores the
-//         // return value or thrown exception from `log`.
-//         log.applyIgnored(undefined, args.map(arg => new ivm.ExternalCopy(arg).copyInto()));
-//     };
-//     // let console = new ivm.ExternalCopy(_console).copy();
-//     let console = _console.copySync();
-//     // let m = console.m.copyInto();
-//     let mRef = console.m;
-//     // global.log(new ivm.ExternalCopy(mRef).copyInto());
-//     let m = function(...args) {
-//         global.log(mRef.applySync(undefined));
-//     }
-//
-//     // global.log(new Proxy({}, {}))
-//     // let out = stdout.getSync('write');
-//
-//     let std = stdout.copy();
-//     global.log(Object.keys(std));
-//
-//     // let megaConsole = {
-//     //     log: function(...args) {console.getSync('log').applyIgnored(undefined, args) },
-//     //     error: console.getSync('error')
-//     // };
-//     // // let loggy = console.getSync('log');
-//     // megaConsole.log('da');
-//     // global.log(console);
-// }, {filename:'index.js'});
-
-setTimeout(function() {
+setTimeout(function () {
     console.log('starting');
-    (async function() {
-        let script = await isolate.compileScript(code, { filename: 'example.js' });
+    (async function () {
+        let script = await isolate.compileScript(code, {filename: 'example.js'});
         await script.run(context);
     }()).catch(console.error);
 }, 2000);
 
 
 // Create an inspector channel on port 10000
-let wss = new WebSocket.Server({ port: 10000 });
+let wss = new WebSocket.Server({port: 10000});
 
-wss.on('connection', function(ws) {
+wss.on('connection', function (ws) {
     // Dispose inspector session on websocket disconnect
     let channel = isolate.createInspectorSession();
+
     function dispose() {
         try {
             channel.dispose();
-        } catch (err) {}
+        } catch (err) {
+        }
     }
+
     ws.on('error', dispose);
     ws.on('close', dispose);
 
     // Relay messages from frontend to backend
-    ws.on('message', function(message) {
+    ws.on('message', function (message) {
         try {
             channel.dispatchProtocolMessage(message);
         } catch (err) {
@@ -151,6 +237,7 @@ wss.on('connection', function(ws) {
             dispose();
         }
     }
+
     channel.onResponse = (callId, message) => send(message);
     channel.onNotification = send;
 });
