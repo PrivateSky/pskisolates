@@ -30,16 +30,11 @@ function deepReference(obj, ivm, depth = 0) {
 jail.setSync('global', jail.derefInto());
 jail.setSync('_ivm', ivm);
 jail.setSync('_console', deepReference(console, ivm));
-// jail.setSync('_setTimeout', new ivm.Reference(function(timeout) {
-//    return new Promise((resolve, reject) => {
-//        console.log('sunt afara si am pornit');
-//        setTimeout(() => {
-//            console.log('sunt afara si am mers');
-//            resolve();
-//        }, timeout)
-//    });
-// }));
-
+jail.setSync('_setTimeout', new ivm.Reference(function (timeout, callbackRef) {
+    setTimeout(function () {
+        callbackRef.applyIgnored(undefined, []);
+    }, timeout);
+}));
 
 
 const code = 'new ' + function () {
@@ -95,7 +90,7 @@ const code = 'new ' + function () {
             }
         };
 
-        function getAccessProxy(obj) {
+        function getAccessProxyFor(obj) {
             return new Proxy(obj, referenceAccessHandler);
         }
 
@@ -129,7 +124,7 @@ const code = 'new ' + function () {
         }
 
         return {
-            getAccessProxy
+            getAccessProxyFor
         };
     }
 
@@ -165,7 +160,7 @@ const code = 'new ' + function () {
     let _rawConsole = _console;
     delete _console;
 
-    const consoleProxy = ReferenceAccess().getAccessProxy(_rawConsole);
+    const consoleProxy = ReferenceAccess().getAccessProxyFor(_rawConsole);
     const consoleWrapper = wrapConsoleLogs(consoleProxy);
 
     console = new Proxy(consoleProxy, {
@@ -178,17 +173,18 @@ const code = 'new ' + function () {
         }
     });
 
-    // setTimeout = function(timeout) {
-    //     console.log('hai timeout', _setTimeout.typeof);
-    //     _setTimeout.apply(undefined, [timeout])
-    //         .then(() => {
-    //             console.log('A MERS TIMEOUT MAAAI');
-    //         })
-    //         .catch(console.error)
-    // }
-    //
-    // setTimeout(100);
+    let _rawSetTimeout = _setTimeout;
+    delete _setTimeout;
 
+    setTimeout = function (callback, timeout) {
+        _rawSetTimeout.apply(undefined, [timeout, new ivm.Reference(function () {
+            callback();
+        })])
+            .catch(() => {
+                console.log('Error calling timeout');
+            });
+
+    };
 
 };
 
