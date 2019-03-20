@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "browserify": "^16.2.3",
-    "isolated-vm": "^1.7.9",
+    "isolated-vm": "^1.7.10",
     "ws": "^6.2.0"
   }
 }
