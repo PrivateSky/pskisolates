@@ -1,0 +1,17 @@
+function IsolateConfig() {
+    return {
+        debug: {
+            useInspector: false,
+            debuggerPort: 10000,
+            delay: 0 // used to postpone execution to have time to connect to debugger server
+        },
+        runtime: {
+            useInspector: false,
+            debuggerPort: 10001,
+            delay: 0
+        }
+    }
+}
+
+
+module.exports = IsolateConfig;
