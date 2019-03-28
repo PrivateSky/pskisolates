@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use isIdenticalKeysHierarchy instead. It was tested and this variant is 10x slower
+ * @param first {Object}
+ * @param second {Object}
+ * @returns {boolean}
+ */
 function hasIdenticalObjectKeysHierarchy(first, second) {
     if (typeof first !== 'object' || typeof second !== 'object') {
         return false;
@@ -51,6 +57,34 @@ function generateObjectKeysHierarchy(obj, currentPropertyName = '') {
     return flattenArray(hierarchies)
 }
 
+function isIdenticalKeysHierarchy(obj1, obj2) {
+    if (typeof obj1 !== 'object' || typeof obj1 !== 'object') {
+        return false;
+    }
+
+    const obj1Keys = Object.keys(obj1);
+    const obj2Keys = Object.keys(obj2);
+
+    if(obj1Keys.length !== obj2Keys.length) {
+        return false;
+    }
+
+    for(let i = 0; i < obj1Keys.length; ++i) {
+        const key = obj1Keys[i];
+        if(!obj2.hasOwnProperty(key)) {
+            return false;
+        }
+
+        if(typeof obj2[key] === 'object') {
+            if(!isIdenticalKeysHierarchy(obj1[key], obj2[key])) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 module.exports = {
-    hasIdenticalObjectKeysHierarchy
+    isIdenticalKeysHierarchy
 };

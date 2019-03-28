@@ -5,7 +5,7 @@ const debuggerServer = require('./debugger');
 
 function IsolatedExecutionEnvironment(config) {
     /** INITIALIZING OBJECT STATE **/
-    if (!utils.hasIdenticalObjectKeysHierarchy(config, defaultConfig)) {
+    if (!utils.isIdenticalKeysHierarchy(config, defaultConfig)) {
         throw new Error('Invalid config argument received');
     }
 
