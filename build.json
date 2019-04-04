@@ -1,0 +1,7 @@
+{
+  "test": {
+    "deps": "requriedBuiltIns, buffer",
+    "bare": false,
+    "bundleExternal": true
+  }
+}

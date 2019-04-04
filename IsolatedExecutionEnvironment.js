@@ -1,6 +1,6 @@
 let ivm = require('isolated-vm');
 const utils = require('./utils/utils');
-const defaultConfig = require('./IsolateConfig')();
+const defaultConfig = require('./IsolateConfig').defaultConfig;
 const debuggerServer = require('./debugger');
 
 function IsolatedExecutionEnvironment(config) {
@@ -34,43 +34,27 @@ function IsolatedExecutionEnvironment(config) {
 
 
     /** PUBLIC METHODS **/
-    async function prepareGlobalEnv(code) {
-        await delay(config.debug.delay);
 
-        const prepareScript = await isolate.compileScript(code, {filename: 'prepareEnvironment.js'});
-        await prepareScript.run(context);
+    async function run(code, runConfig) {
+        if(!runConfig) {
+            runConfig = {
+                delay: config.runtime.delay,
+                fileName: 'isolatedEnvironment.js'
+            }
+        }
 
-        return this;
+        await __run(runConfig.delay, runConfig.fileName, code);
     }
 
-
-    async function prepareRequire(code) {
-        await delay(config.debug.delay);
-
-        const prepareScript = await isolate.compileScript(code, {filename: 'prepareRequire.js'});
-        await prepareScript.run(context);
-
-        return this;
-    }
-
-    async function secureGlobalEnv(code) {
-        await delay(config.debug.delay);
-
-        const prepareScript = await isolate.compileScript(code, {filename: 'secureEnvironment.js'});
-        await prepareScript.run(context);
-
-        return this;
-    }
-
-    async function run(code) {
-        await delay(config.runtime.delay);
-
-        const prepareScript = await isolate.compileScript(code, {filename: 'isolateRuntime.js'});
-        await prepareScript.run(context);
-    }
 
     /** INTERNAL METHODS **/
 
+    async function __run(delay, fileName, code) {
+        await _delay(delay);
+
+        const prepareScript = await isolate.compileScript(code, {filename: fileName});
+        await prepareScript.run(context);
+    }
 
     function _deepReference(obj, ivm, depth = 0) {
         let newObj = {};
@@ -93,13 +77,11 @@ function IsolatedExecutionEnvironment(config) {
         return newObj;
     }
 
-    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const _delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     /** EXPORTS **/
 
-    this.prepareGlobalEnv = prepareGlobalEnv;
-    this.prepareRequire = prepareRequire;
-    this.secureGlobalEnv = secureGlobalEnv;
+    this.run = run;
 }
 
 

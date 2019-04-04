@@ -1,3 +1,4 @@
+/*
 // Create a new isolate limited to 128MB
 let ivm = require('isolated-vm');
 const WebSocket = require('ws');
@@ -35,12 +36,31 @@ jail.setSync('_setTimeout', new ivm.Reference(function (timeout, callbackRef) {
         callbackRef.applyIgnored(undefined, []);
     }, timeout);
 }));
+jail.setSync('_require', new ivm.Reference(function (name) {
+    return deepReference(require(name), ivm);
+}));
+
+jail.setSync('_testWeirdString', new ivm.Reference(function(str) {
+    console.log(str, str.startsWith('super'));
+}))
+
+jail.setSync('_readFileSync', new ivm.Reference(function(name) {
+    const fs = require('fs');
+
+    const content = fs.readFileSync(name, 'utf8');
+
+    return new ivm.Reference(content);
+}))
 
 
 const code = 'new ' + function () {
     debugger;
     let ivm = _ivm;
     delete _ivm;
+
+
+
+
 
     function ReferenceAccess() {
         const referenceAccessHandler = {
@@ -186,6 +206,22 @@ const code = 'new ' + function () {
 
     };
 
+    // let require = _require;
+    //
+    // let fsRef = require.applySync(undefined, ['fs']);
+    // const fs = ReferenceAccess().getAccessProxyFor(fsRef);
+    //
+    // fs.readFileSync('./bundle.js');
+
+    let readFile = _readFileSync;
+
+    let content = readFile.applySync(undefined, ['./with-inspector.js']).copySync();
+
+    // const utfContent = new Uint8Array.from(content).toString();
+
+    console.log(content);
+
+    console.log('a mers');
 };
 
 
@@ -242,4 +278,11 @@ console.log('Inspector: chrome-devtools://devtools/bundled/inspector.html?experi
 // bootstrap.runSync(context);
 
 // isolate.compileScriptSync('log("f");').runSync(context);
-// isolate.compileScriptSync('log(typeof require)').runSync(context);
+// isolate.compileScriptSync('log(typeof require)').runSync(context);*/
+
+
+const code = require('./builds/devel/test');
+
+const buffer = code('/home/developer/Documents/isolationModule/node_modules/buffer/index.js').Buffer;
+
+console.log(buffer.from([1, 2]));

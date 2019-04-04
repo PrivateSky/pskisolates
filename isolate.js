@@ -4,28 +4,31 @@ const IsolateConfig = require('./IsolateConfig');
 const prepareEnvCode = require('./defaultPrepareEnvironmentCode');
 const prepareRequireCode = require('./prepareRequireCode');
 const secureGlobalEnvCode = require('./secureGlobalEnvCode');
+const insertBundlesCode = require('./insertBundlesCode');
+const IsolateBuilder = require('./isolateBuilder');
 
 const fs = require('fs');
 
-async function isolate() {
+async function isolate(...browserifyBundles) {
 
-    const config = new IsolateConfig();
-    const isolatedEnv = new IsolatedEnv(config);
+    const config = IsolateConfig.defaultConfig;
+    config.debug.useInspector = true;
+    config.debug.delay = 3000;
 
-    const bundle = fs.readFileSync('./pskruntime.js', 'utf8');
+    const isolateBuilder = new IsolateBuilder(config);
 
-
-
-    await isolatedEnv.prepareGlobalEnv(prepareEnvCode);
-
-    const req = prepareRequireCode(bundle);
-    // console.log(req);
-    await isolatedEnv.prepareRequire(req);
-    await isolatedEnv.secureGlobalEnv(secureGlobalEnvCode);
+    return isolateBuilder
+        .prepareGlobalEnv(prepareEnvCode)
+        .prepareRequire(prepareRequireCode)
+        .insertBundles(insertBundlesCode(browserifyBundles))
+        .secureGlobalEnv(secureGlobalEnvCode)
+        .build();
 }
 
+const bundle = fs.readFileSync('./builds/devel/test.js', 'utf8');
 
-isolate().then(() => {
+isolate(bundle).then((is) => {
+    is.run('');
     console.log('works');
 })
 .catch((err) => {

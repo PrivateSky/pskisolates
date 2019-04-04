@@ -1,37 +1,47 @@
-function createRequire (browserifyBundle) {
+function createRequire(shimsBundle) {
     const code = `new function() {
         debugger;
         let ivm = _ivm;
-
-        global.Module = {};
-        global.Module.prototype = global.Module.__proto__ = {};
         
-        
-        // new Function(${syntaxHelper()})();
-        
-        global.Module.prototype.require = global.require = function(name) {
+        global.require = function(name) {
             let require = _require;
-            
-            console.log('trying to load module', name);
-            
-            return require.applySync(undefined, [name]);
-        }
+
+            return global.ReferenceAccess.getAccessProxyFor(require.applySync(undefined, [name]));
+        };
         
-        const bundle = ${browserifyBundle};
+        
+        const bundle = ${shimsBundle}
+        
+        bundle('requriedBuiltIns');
+        
+        // const buffer = require('buffer');
+        // const b = buffer.Buffer;
+        //
+        // const x = b.from([70, 71]);
+        //
+        // console.log(x.toString());
+        //
+        // const url = require('url');
+        //
+        // const parsed = url.parse('http://127.0.0.1:8080');
+        //
+        // console.log('a mers cumva');
     }; `;
 
     return code;
 }
 
-const syntaxHelper = function() {} /*function () {
-    return 'new ' + function () {
+const code = 'new ' + function () {
+    debugger;
+    let ivm = _ivm;
+
+    global.require = function(name) {
         let require = _require;
 
-        let path = require('path');
-
-        require.applySync(undefined, [name]);
+        return global.ReferenceAccess.getAccessProxyFor(require.applySync(undefined, [name]));
     };
-};*/
+};
 
-module.exports = createRequire;
+
+module.exports = code;
 
