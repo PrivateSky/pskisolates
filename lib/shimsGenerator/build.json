@@ -1,6 +1,6 @@
 {
   "test": {
-    "deps": "requriedBuiltIns, buffer",
+    "deps": "requiredBuiltins",
     "bare": false,
     "bundleExternal": true
   }
