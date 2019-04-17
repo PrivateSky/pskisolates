@@ -1,4 +1,4 @@
-const Isolate = require('./lib/Isolate');
+const Isolate = require('./lib/DefaultConfiguredIsolate');
 const IsolateBuilder = require('./lib/IsolateBuilder');
 const IsolateConfig = require('./lib/IsolateConfig');
 
