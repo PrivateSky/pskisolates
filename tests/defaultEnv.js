@@ -6,6 +6,7 @@ const defaultBundle = fs.readFileSync('../lib/shimsGenerator/builds/devel/sandbo
 const config = Isolate.IsolateConfig.defaultConfig;
 config.debug.useInspector = true;
 config.runtime.delay = 10;
+config.debug.logs = false;
 
 Isolate.getDefaultIsolate({shimsBundle: defaultBundle, config}, async (err, defaultIsolate) => {
     if(err) {
@@ -14,17 +15,10 @@ Isolate.getDefaultIsolate({shimsBundle: defaultBundle, config}, async (err, defa
 
     await defaultIsolate.run(`
         debugger;
-        // const buffer = require('url');
-        // console.log('uite buffer', buffer.parse('http://google.com'));
-        // console.log('sunt in isolate');
-        
-        // const stream = require('stream');
-        // console.log(global);
         const crypto = require('crypto');
         
         const bytes = crypto.randomBytes(10);
-        
-        console.log('hopa crypto', bytes.copySync());
+        console.log('bytes', bytes);
     `);
     console.log('Init successful');
 });
