@@ -4,12 +4,11 @@ const fs = require('fs');
 const defaultBundle = fs.readFileSync('../lib/shimsGenerator/builds/devel/sandboxBase.js', 'utf8');
 
 const config = Isolate.IsolateConfig.defaultConfig;
-config.debug.useInspector = true;
-config.runtime.delay = 10;
-config.debug.logs = false;
+config.debug.useInspector = false;
+config.runtime.delay = 0;
 
 Isolate.getDefaultIsolate({shimsBundle: defaultBundle, config}, async (err, defaultIsolate) => {
-    if(err) {
+    if (err) {
         throw err;
     }
 
@@ -20,5 +19,6 @@ Isolate.getDefaultIsolate({shimsBundle: defaultBundle, config}, async (err, defa
         const bytes = crypto.randomBytes(10);
         console.log('bytes', bytes);
     `);
-    console.log('Init successful');
+
+    console.log('Run successful');
 });
