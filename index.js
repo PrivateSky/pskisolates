@@ -1,12 +1,13 @@
 const Isolate = require('./lib/DefaultConfiguredIsolate');
 const IsolateBuilder = require('./lib/IsolateBuilder');
 const IsolateConfig = require('./lib/IsolateConfig');
+const utils = require('./lib/utils/utils');
 
 
 function getDefaultIsolate({shimsBundle, browserifyBundles, config}, callback) {
-    Isolate.initDefaultIsolate({config, shimsBundle, browserifyBundles})
-        .then(isolate => callback(undefined, isolate))
-        .catch(callback);
+    const defaultIsolatePromise = Isolate.initDefaultIsolate({config, shimsBundle, browserifyBundles});
+
+    return utils.resolveWithCallbackIfAvailable(defaultIsolatePromise, callback);
 }
 
 
