@@ -1,7 +1,7 @@
 const Isolate = require('..');
 const fs = require('fs');
 
-const defaultBundle = fs.readFileSync('../lib/shimsGenerator/builds/devel/sandboxBase.js', 'utf8');
+const defaultBundle = fs.readFileSync('../../../builds/devel/sandboxBase.js', 'utf8');
 
 const config = Isolate.IsolateConfig.defaultConfig;
 config.debug.useInspector = false;
