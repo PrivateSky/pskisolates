@@ -4,8 +4,8 @@ const IsolateConfig = require('./lib/IsolateConfig');
 const utils = require('./lib/utils/utils');
 
 
-function getDefaultIsolate({shimsBundle, browserifyBundles, config}, callback) {
-    const defaultIsolatePromise = Isolate.initDefaultIsolate({config, shimsBundle, browserifyBundles});
+function getDefaultIsolate({shimsBundle, browserifyBundles, config, externalApi}, callback) {
+    const defaultIsolatePromise = Isolate.initDefaultIsolate({config, shimsBundle, browserifyBundles, externalApi});
 
     return utils.resolveWithCallbackIfAvailable(defaultIsolatePromise, callback);
 }
