@@ -14,5 +14,6 @@ function getDefaultIsolate({shimsBundle, browserifyBundles, config, externalApi}
 module.exports = {
     getDefaultIsolate,
     IsolateBuilder,
-    IsolateConfig
+    IsolateConfig,
+    createDeepReference: utils.createDeepReference
 };
